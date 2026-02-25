@@ -1,0 +1,40 @@
+# =========================
+# OS / Editor
+# =========================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.iml
+
+# =========================
+# Env / Secrets
+# =========================
+.env
+*.env
+!.env.example
+
+# =========================
+# Logs
+# =========================
+*.log
+logs/
+
+# =========================
+# Docker / Compose
+# =========================
+**/docker-compose.override.yml
+
+# =========================
+# Grafana local state (if any)
+# =========================
+grafana-data/
+prometheus-data/
+tempo-data/
+loki-data/
+
+# =========================
+# Misc
+# =========================
+tmp/
+.cache/
