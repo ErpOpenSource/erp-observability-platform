@@ -1,0 +1,117 @@
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:${OTEL_COLLECTOR_IMAGE_TAG:-0.97.0}
+    container_name: otel-collector
+    command: ["--config=/etc/otelcol-contrib/config.yml"]
+    volumes:
+      - ../config/otel-collector-config.yml:/etc/otelcol-contrib/config.yml:ro
+    ports:
+      - "${OTEL_COLLECTOR_OTLP_GRPC_PORT:-4317}:4317"     # OTLP gRPC
+      - "${OTEL_COLLECTOR_OTLP_HTTP_PORT:-4318}:4318"     # OTLP HTTP
+      - "${OTEL_COLLECTOR_PROM_EXPORTER_PORT:-8889}:8889" # Prometheus exporter (scrape)
+    environment:
+      - OTELCOL_LOG_LEVEL=${OTELCOL_LOG_LEVEL:-info}
+      - DEPLOYMENT_ENVIRONMENT=${DEPLOYMENT_ENVIRONMENT:-dev}
+    depends_on:
+      - tempo
+    networks:
+      - erp-platform
+    restart: unless-stopped
+
+  tempo:
+    image: grafana/tempo:${TEMPO_IMAGE_TAG:-2.4.1}
+    container_name: tempo
+    command: ["-config.file=/etc/tempo/tempo.yml"]
+    volumes:
+      - ../config/tempo.yml:/etc/tempo/tempo.yml:ro
+      - tempo-data:/var/tempo
+    ports:
+      - "${TEMPO_HTTP_PORT:-3200}:3200" # Tempo HTTP (query)
+    networks:
+      - erp-platform
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:${PROMETHEUS_IMAGE_TAG:-v2.52.0}
+    container_name: prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=${PROMETHEUS_RETENTION_TIME:-15d}"
+    volumes:
+      - ../config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    networks:
+      - erp-platform
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:${GRAFANA_IMAGE_TAG:-10.4.2}
+    container_name: grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+
+      # Used by provisioning templates
+      - PROMETHEUS_URL=${PROMETHEUS_URL:-http://prometheus:9090}
+      - TEMPO_URL=${TEMPO_URL:-http://tempo:3200}
+      - LOKI_URL=${LOKI_URL:-http://loki:3100}
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ../config/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../config/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    depends_on:
+      - prometheus
+      - tempo
+    networks:
+      - erp-platform
+    restart: unless-stopped
+
+  # ==========================
+  # Optional logs stack
+  # Enable with: docker compose --profile logs up -d
+  # ==========================
+  loki:
+    profiles: ["logs"]
+    image: grafana/loki:${LOKI_IMAGE_TAG:-2.9.4}
+    container_name: loki
+    command: ["-config.file=/etc/loki/local-config.yaml"]
+    volumes:
+      - loki-data:/loki
+    ports:
+      - "${LOKI_PORT:-3100}:3100"
+    networks:
+      - erp-platform
+    restart: unless-stopped
+
+  promtail:
+    profiles: ["logs"]
+    image: grafana/promtail:${PROMTAIL_IMAGE_TAG:-2.9.4}
+    container_name: promtail
+    command: ["-config.file=/etc/promtail/promtail.yml"]
+    volumes:
+      - ../config/promtail.yml:/etc/promtail/promtail.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - loki
+    networks:
+      - erp-platform
+    restart: unless-stopped
+
+volumes:
+  tempo-data:
+  prometheus-data:
+  grafana-data:
+  loki-data:
+
+networks:
+  erp-platform:
+    name: ${ERP_PLATFORM_NETWORK_NAME:-erp-platform}
+    driver: bridge
