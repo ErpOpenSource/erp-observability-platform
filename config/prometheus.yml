@@ -1,0 +1,21 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # OTel Collector -> Prometheus exporter (OTLP metrics to Prometheus)
+  - job_name: "otel-collector"
+    static_configs:
+      - targets: ["otel-collector:8889"]
+
+  # ERP API Gateway (Spring Boot actuator)
+  - job_name: "erp-api-gateway"
+    metrics_path: "/actuator/prometheus"
+    static_configs:
+      - targets: ["erp-api-gateway:8080"]
+
+  # Template for future microservices:
+  # - job_name: "erp-service-xyz"
+  #   metrics_path: "/actuator/prometheus"
+  #   static_configs:
+  #     - targets: ["erp-service-xyz:8080"]
