@@ -1,0 +1,15 @@
+main → estable/producción
+
+develop → integración (opcional, si vas con GitFlow)
+
+Feature branches:
+
+feat/<scope>-<desc>
+
+fix/<scope>-<desc>
+
+chore/<desc>
+
+Si quieres simplicidad enterprise (muy común hoy):
+
+Solo main + feature branches + PRs (sin develop).
